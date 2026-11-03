@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BOE US RMA 收发管理系统 · 设计稿 v1</title>
+<style>
+  :root{
+    --primary:#1677ff; --success:#52c41a; --warning:#faad14; --error:#ff4d4f;
+    --text:#1f1f1f; --text2:#595959; --text3:#8c8c8c;
+    --border:#e5e6eb; --bg:#f2f3f5; --card:#ffffff;
+    --radius:6px; --gap:16px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",Arial,sans-serif;
+       background:var(--bg); color:var(--text); font-size:14px; line-height:1.5; padding:24px}
+  h1{font-size:22px;font-weight:600}
+  h2{font-size:15px;font-weight:600;margin-bottom:12px}
+  .en{font-size:12px;color:var(--text3);font-weight:400}
+  .page-head{margin-bottom:20px}
+  .page-head p{color:var(--text2);margin-top:6px;font-size:13px}
+  .section-title{font-size:16px;font-weight:600;margin:28px 0 14px;padding-left:10px;border-left:4px solid var(--primary)}
+
+  /* design specs */
+  .specs{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:var(--gap)}
+  .spec-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+  .swatches{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .swatch{width:100%;height:44px;border-radius:4px;display:flex;align-items:flex-end;justify-content:center;
+          color:#fff;font-size:11px;padding:4px}
+  .spec-card ul{list-style:none;font-size:12px;color:var(--text2)}
+  .spec-card li{padding:3px 0;border-bottom:1px dashed #f0f0f0}
+  .spec-card li:last-child{border:none}
+
+  /* screens wall */
+  .screens{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+  .screen{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;
+          box-shadow:0 2px 10px rgba(0,0,0,.06);display:flex;flex-direction:column}
+  .screen .bar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;
+               border-bottom:1px solid var(--border);background:#fafafa}
+  .screen .bar b{font-size:13px}
+  .screen .bar span{font-size:11px;color:var(--text3)}
+
+  /* web screen sizing */
+  .web{width:760px}
+  .web .body{padding:16px;display:flex;flex-direction:column;gap:14px}
+
+  /* mobile */
+  .mobile{width:320px}
+  .mobile .body{padding:0}
+  .phone{background:#F7F8FA;padding:0}
+  .phone .status{background:#fff;padding:6px 16px;font-size:12px;color:var(--text3);display:flex;justify-content:space-between}
+  .phone .app-head{background:var(--primary);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:8px}
+  .phone .app-head b{font-size:15px}
+  .phone .content{padding:12px;display:flex;flex-direction:column;gap:10px}
+
+  /* generic UI comps */
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--border)}
+  .tab{padding:8px 14px;font-size:13px;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent}
+  .tab.on{color:var(--primary);border-bottom-color:var(--primary);font-weight:500}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:6px 14px;border-radius:4px;
+       font-size:13px;cursor:pointer;border:1px solid transparent}
+  .btn.primary{background:var(--primary);color:#fff}
+  .btn.ghost{background:#fff;border-color:var(--border);color:var(--text)}
+  .btn.danger{background:var(--error);color:#fff}
+  .btn.sm{padding:3px 10px;font-size:12px}
+  .btn.block{width:100%;padding:12px;font-size:15px}
+  .btn[disabled]{opacity:.4;cursor:not-allowed}
+
+  .tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;line-height:18px}
+  .tag.blue{background:#e6f4ff;color:#0958d9}
+  .tag.green{background:#f6ffed;color:#389e0d}
+  .tag.orange{background:#fff7e6;color:#d46b08}
+  .tag.red{background:#fff1f0;color:#cf1322}
+  .tag.gray{background:#f5f5f5;color:#595959}
+
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid #f0f0f0}
+  th{color:var(--text3);font-weight:500;background:#fafafa;font-size:11px}
+
+  .kv{display:flex;gap:10px;font-size:12px;color:var(--text2)}
+  .kv b{color:var(--text)}
+
+  /* progress */
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .stat{background:#fafafa;border:1px solid var(--border);border-radius:6px;padding:10px}
+  .stat .num{font-size:20px;font-weight:600;color:var(--primary)}
+  .stat .lbl{font-size:11px;color:var(--text3);margin-top:2px}
+
+  /* kitting scanner */
+  .scan-area{background:#fff;border-radius:8px;padding:16px;text-align:center}
+  .scan-icon{width:120px;height:120px;margin:0 auto 10px;border:3px dashed #c6d4ea;border-radius:14px;
+             display:flex;align-items:center;justify-content:center;font-size:40px}
+  .feedback{border-radius:6px;padding:10px;font-size:13px;text-align:left}
+  .feedback.ok{background:#f6ffed;border:1px solid #b7eb8f;color:#237804}
+  .feedback.err{background:#fff1f0;border:1px solid #ffa39e;color:#a8071a}
+  .feedback.warn{background:#fffbe6;border:1px solid #ffe58f;color:#ad6800}
+
+  .phone .sticky{position:sticky;bottom:0;background:#fff;border-top:1px solid var(--border);padding:10px 12px}
+  .bilingual{display:flex;flex-direction:column}
+  .bilingual small{font-size:10px;color:var(--text3);font-weight:400}
+
+  .note{font-size:12px;color:var(--text3);margin-top:6px}
+  .pill-row{display:flex;gap:8px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <h1>BOE US RMA 收发管理系统 · 设计稿 v1</h1>
+  <p>依据 PRD V1.18 + 设计评审决议（成熟组件库风格 · 简洁 · 中英双语 · 3Tab/4Tab · 点击逐个扫 · 断网禁提交）</p>
+</div>
+
+<div class="section-title">设计规范 Design Tokens</div>
+<div class="specs">
+  <div class="spec-card">
+    <h2>主色 / 功能色</h2>
+    <div class="swatches">
+      <div class="swatch" style="background:#1677ff">Primary #1677FF</div>
+    </div>
+    <div class="swatches">
+      <div class="swatch" style="background:#52c41a;height:32px">Success</div>
+      <div class="swatch" style="background:#faad14;height:32px">Warning</div>
+      <div class="swatch" style="background:#ff4d4f;height:32px">Error</div>
+    </div>
+  </div>
+  <div class="spec-card">
+    <h2>字体字号</h2>
+    <ul>
+      <li>页面标题 22 / 600</li>
+      <li>模块标题 15 / 600</li>
+      <li>正文 14 / 400</li>
+      <li>辅助/英文 12 / 400 #8c8c8c</li>
+      <li>字体 PingFang SC / Microsoft YaHei</li>
+    </ul>
+  </div>
+  <div class="spec-card">
+    <h2>间距与圆角</h2>
+    <ul>
+      <li>基准间距 8px（8/16/24）</li>
+      <li>卡片圆角 6–10px</li>
+      <li>按钮高度 32（常规）/44（移动端）</li>
+      <li>边框 #E5E6EB，背景 #F2F3F5</li>
+    </ul>
+  </div>
+  <div class="spec-card">
+    <h2>组件与状态</h2>
+    <ul>
+      <li>Button：Primary / Ghost / Danger / Disabled</li>
+      <li>Tag：蓝/绿/橙/红/灰 表状态</li>
+      <li>Tab：下划线选中态</li>
+      <li>反馈条：成功/警示/错误</li>
+    </ul>
+  </div>
+</div>
+
+<div class="section-title">Web 后台页面</div>
+<div class="screens">
+
+  <!-- P-03 物流允收 · 订单索引 -->
+  <div class="screen web">
+    <div class="bar"><b>P-03 物流允收 · 订单索引</b><span>以 RMA号 / Buffer订单号 为索引 · 点击进按箱收货</span></div>
+    <div class="body">
+      <div class="kv"><span>待收货订单：<b>6</b> 个</span><span>提示：点击订单号进入「按箱收货」</span></div>
+      <table>
+        <thead><tr><th>RMA号 / Buffer订单号</th><th>客户</th><th>料号</th><th>RMA总量</th><th>已收</th><th>待收</th><th>状态</th></tr></thead>
+        <tbody>
+          <tr><td><a style="color:#1677ff">RMA-9001</a></td><td>BOE US</td><td>PN-A100</td><td>120</td><td>86</td><td>34</td><td><span class="tag blue">收货中</span></td></tr>
+          <tr><td><a style="color:#1677ff">BUF-2026-071</a></td><td>BOE US</td><td>PN-B200</td><td>40</td><td>12</td><td>28</td><td><span class="tag blue">收货中</span></td></tr>
+          <tr><td><a style="color:#1677ff">RMA-9002</a></td><td>BOE US</td><td>PN-A100</td><td>60</td><td>60</td><td>0</td><td><span class="tag green">已收齐</span></td></tr>
+        </tbody>
+      </table>
+      <div class="note">列表只显收货进度，不显 Buffer 库存（Buffer 仅在还货看板/订单详情）</div>
+    </div>
+  </div>
+
+  <!-- P-03b 按箱收货详情 -->
+  <div class="screen web">
+    <div class="bar"><b>P-03b 按箱收货（RMA-9001）</b><span>点击订单号进入 · 箱号+SN明细+封箱打印</span></div>
+    <div class="body">
+      <div class="kv"><span>RMA-9001 · PN-A100</span><span>已收 86 / 待收 34</span><span>POD：<b style="color:#52c41a">已上传</b></span></div>
+      <div style="display:flex;gap:14px">
+        <div style="flex:1">
+          <table>
+            <thead><tr><th>箱号 Box No.</th><th>箱内SN数</th><th>状态</th><th>操作</th></tr></thead>
+            <tbody>
+              <tr><td>BOE261103001</td><td>12</td><td><span class="tag green">已封箱</span></td><td><span class="tag gray">已打印</span></td></tr>
+              <tr><td>BOE261103002</td><td>8</td><td><span class="tag blue">录入中</span></td><td><a style="color:#1677ff">继续录入</a></td></tr>
+              <tr><td>BOE261103003</td><td>0</td><td><span class="tag gray">空白</span></td><td><a style="color:#1677ff">录入</a></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="width:210px;background:#fafafa;border:1px solid #e5e6eb;border-radius:6px;padding:12px">
+          <div style="font-size:12px;color:#595959;margin-bottom:6px">当前箱 BOE261103002</div>
+          <div style="font-size:11px;color:#8c8c8c;line-height:1.8">SN 明细：<br>SN-88213<br>SN-88214<br>SN-88215 …</div>
+          <button class="btn primary sm" style="margin-top:10px;width:100%">封箱并打印箱标</button>
+          <div class="note">标签 = 箱号 + SN 明细</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- P-04 差异审核工作台 -->
+  <div class="screen web">
+    <div class="bar"><b>P-04 差异审核工作台</b><span>Discrepancy Approval · 项目人员</span></div>
+    <div class="body">
+      <div class="tabs"><div class="tab on">待审批 Pending</div><div class="tab">已处理 Done</div><div class="tab">双异常查询 Records</div></div>
+      <table>
+        <thead><tr><th>RMA号 / 订单号</th><th>差异号</th><th>差异类型</th><th>SN / 数量差</th><th>照片</th><th>操作</th></tr></thead>
+        <tbody>
+          <tr><td><a style="color:#1677ff">RMA-9001</a></td><td>D-001</td><td><span class="tag orange">多收 QTY_OVER</span></td><td>+2</td><td><span class="tag blue">3 张</span></td><td><a style="color:#1677ff">审批</a></td></tr>
+          <tr><td><a style="color:#1677ff">RMA-9001</a></td><td>D-002</td><td><span class="tag red">少收 QTY_SHORT</span></td><td>-1</td><td><span class="tag blue">2 张</span></td><td><a style="color:#1677ff">审批</a></td></tr>
+          <tr><td><a style="color:#1677ff">BUF-2026-071</a></td><td>D-003</td><td><span class="tag gray">料号不符 PN</span></td><td>SN-8812</td><td><span class="tag blue">1 张</span></td><td><a style="color:#1677ff">审批</a></td></tr>
+        </tbody>
+      </table>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn ghost">驳回 Reject</button>
+        <button class="btn primary">审批通过 Approve</button>
+      </div>
+      <div class="note">审批通过 → 修正预报（REVISED）+ 永久保留 预报异常/到货异常 双记录</div>
+    </div>
+  </div>
+
+  <!-- P-06 出库管理 -->
+  <div class="screen web">
+    <div class="bar"><b>P-06 出库管理</b><span>Outbound · 仓库/项目人员</span></div>
+    <div class="body">
+      <div class="tabs"><div class="tab on">发客户</div><div class="tab">发维修中心</div><div class="tab">报废处置</div><div class="tab">调拨</div></div>
+      <table>
+        <thead><tr><th>出库单</th><th>还货 RMA</th><th>SN 数</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody>
+          <tr><td>OB-1001</td><td>RMA-9001</td><td>5</td><td><span class="tag blue">待打包</span></td><td><a style="color:#1677ff">查看详情</a></td></tr>
+          <tr><td>OB-1002</td><td>RMA-9002</td><td>8</td><td><span class="tag green">已出库</span></td><td><a style="color:#1677ff">查看详情</a></td></tr>
+          <tr><td>OB-1003</td><td>RMA-9003</td><td>3</td><td><span class="tag orange">待发运</span></td><td><a style="color:#1677ff">登记物流</a></td></tr>
+        </tbody>
+      </table>
+      <div class="note">列表以出库单/RMA 为行，<b>点击进详情查看该单多个 SN 明细</b>（列表不平铺 SN）</div>
+      <div class="kv"><span>退货还货默认校验：同 PN Buffer 可用 <b>18</b></span><span>跨 PN 替代：<a style="color:#1677ff">独立审批</a></span></div>
+      <div class="note">报废 Tab：项目人员审批（审批人/时间/意见必填），驳回可重提交；调拨 Tab：移库单+清点确认，仅 RECEIVED/JUDGED/RETAINED 可调拨</div>
+    </div>
+  </div>
+
+  <!-- P-09 还货看板 -->
+  <div class="screen web">
+    <div class="bar"><b>P-09 RMA 还货看板 · TAT</b><span>Return Board · 只读（系统自动关闭）</span></div>
+    <div class="body">
+      <table>
+        <thead><tr><th>RMA</th><th>状态</th><th>还货进度</th><th>还货方式</th><th>TAT</th></tr></thead>
+        <tbody>
+          <tr><td>RMA-9001</td><td><span class="tag green">已还货</span></td><td>10 / 10</td><td>原片修复 8 · Buffer 2</td><td><span class="tag green">6 天</span></td></tr>
+          <tr><td>RMA-9002</td><td><span class="tag blue">待还货</span></td><td>6 / 10</td><td>CID 2 · Buffer 4</td><td><span class="tag orange">8 天 预警</span></td></tr>
+          <tr><td>RMA-9003</td><td><span class="tag blue">待还货</span></td><td>3 / 10</td><td>原片修复 3</td><td><span class="tag red">11 天 超期</span></td></tr>
+        </tbody>
+      </table>
+      <div class="note">TAT = 完整收货 → 完整发货完成（=CLOSED）；≤10 自然日，第 8 天预警（橙），>10 标红。RMA 关闭为系统自动，无手工关闭入口。</div>
+    </div>
+  </div>
+
+  <!-- P-11 Kitting Web 扫码枪 -->
+  <div class="screen web">
+    <div class="bar"><b>P-11 Kitting 扫码（Web · 扫码枪）</b><span>电脑 + 扫码枪 · 扫入即校验</span></div>
+    <div class="body">
+      <div class="stats">
+        <div class="stat"><div class="num">120</div><div class="lbl">RMA 总量</div></div>
+        <div class="stat"><div class="num" style="color:#52c41a">86</div><div class="lbl">已收</div></div>
+        <div class="stat"><div class="num" style="color:#faad14">34</div><div class="lbl">待收</div></div>
+      </div>
+      <div style="display:flex;gap:14px">
+        <div style="flex:1">
+          <div style="font-size:12px;color:#595959;margin-bottom:6px">扫码枪输入（自动聚焦，扫一下即回车校验）</div>
+          <div style="display:flex;gap:8px">
+            <div style="flex:1;border:1px solid #1677ff;border-radius:4px;padding:9px 12px;color:#1677ff;font-family:monospace;background:#f0f7ff">SN-88215<span style="color:#1677ff">|</span></div>
+            <button class="btn primary">录入</button>
+          </div>
+          <table style="margin-top:10px">
+            <thead><tr><th>SN</th><th>校验</th><th>结果</th></tr></thead>
+            <tbody>
+              <tr><td>SN-88213</td><td>四维通过</td><td><span class="tag green">√ 通过</span></td></tr>
+              <tr><td>SN-88214</td><td>四维通过</td><td><span class="tag green">√ 通过</span></td></tr>
+              <tr><td>SN-88216</td><td>PN 不符</td><td><span class="tag red">差异</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="width:200px;background:#fafafa;border:1px solid #e5e6eb;border-radius:6px;padding:12px">
+          <div style="font-size:12px;color:#595959">当前箱 BOE261103002</div>
+          <div style="font-size:11px;color:#8c8c8c;margin-top:6px">已扫 8 片</div>
+          <button class="btn ghost sm" style="margin-top:10px;width:100%">封箱并打印箱标</button>
+        </div>
+      </div>
+      <div class="feedback ok" style="margin-top:2px">✓ SN-88215 校验通过（SN在册 / PN / RMA号 / 数量 一致）</div>
+      <div style="display:flex;justify-content:flex-end;margin-top:6px"><button class="btn primary">提交锁定</button></div>
+    </div>
+  </div>
+
+  <!-- P-12 出库打包 Web 扫码枪 -->
+  <div class="screen web">
+    <div class="bar"><b>P-12 出库打包（Web · 扫码枪）</b><span>电脑 + 扫码枪 · 打包→箱标→发运</span></div>
+    <div class="body">
+      <div class="kv"><span>出库单：<b>OB-1001</b></span><span>还货 RMA：<b>RMA-9001</b></span><span>发货箱：<b>OB261103001</b></span></div>
+      <div style="display:flex;gap:14px">
+        <div style="flex:1">
+          <div style="font-size:12px;color:#595959;margin-bottom:6px">扫码枪扫 SN 入箱</div>
+          <div style="display:flex;gap:8px">
+            <div style="flex:1;border:1px solid #1677ff;border-radius:4px;padding:9px 12px;color:#1677ff;font-family:monospace;background:#f0f7ff">SN-88220|</div>
+            <button class="btn primary">入箱</button>
+          </div>
+          <div style="margin-top:10px;font-size:11px;color:#8c8c8c;line-height:1.9">本箱 SN（5）：88213 / 88215 / 88220 / 88231 / 88240</div>
+        </div>
+        <div style="width:200px;display:flex;flex-direction:column;gap:8px">
+          <div style="background:#fafafa;border:1px solid #e5e6eb;border-radius:6px;padding:8px">
+            <div style="font-size:11px;color:#8c8c8c">重量 kg *</div><div style="font-weight:600">2.35</div>
+          </div>
+          <div style="background:#fafafa;border:1px solid #e5e6eb;border-radius:6px;padding:8px">
+            <div style="font-size:11px;color:#8c8c8c">材积 m³ *</div><div style="font-weight:600">0.012</div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span style="font-size:12px;color:#8c8c8c">物流公司 *</span>
+        <span class="tag gray">请选择</span>
+        <span style="font-size:12px;color:#8c8c8c">物流单号 *</span>
+        <span style="font-size:12px;color:#bfbfbf">待填写</span>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn ghost">打印箱标</button>
+        <button class="btn primary">提交发运</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="section-title">移动端扫码页面</div>
+<div class="screens">
+
+  <!-- M-01 Kitting -->
+  <div class="screen mobile">
+    <div class="bar"><b>M-01 Kitting 逐片扫码</b><span>点击逐个扫</span></div>
+    <div class="body phone">
+      <div class="status"><span>9:41</span><span>BOE US RMA</span></div>
+      <div class="app-head"><b>逐片扫码 · 箱 BOE261103002</b></div>
+      <div class="content">
+        <div class="stats" style="grid-template-columns:repeat(3,1fr)">
+          <div class="stat" style="padding:8px"><div class="num" style="font-size:16px">120</div><div class="lbl">RMA总量</div></div>
+          <div class="stat" style="padding:8px"><div class="num" style="font-size:16px;color:#52c41a">86</div><div class="lbl">已收</div></div>
+          <div class="stat" style="padding:8px"><div class="num" style="font-size:16px;color:#faad14">34</div><div class="lbl">待收</div></div>
+        </div>
+        <div class="scan-area">
+          <div class="scan-icon">📷</div>
+          <button class="btn primary block">点击扫码 / Scan</button>
+          <div class="note">本箱已扫 8 片</div>
+        </div>
+        <div class="feedback ok">✓ 校验通过 · SN-88215（料号/ RMA 一致）</div>
+        <div class="feedback err">✕ 差异 · 该 SN 不在本批次预报清单，请拍照后提交审批</div>
+        <div class="feedback warn">⚠ 网络异常，数据未提交，请恢复后重试</div>
+      </div>
+      <div class="sticky">
+        <button class="btn primary block">提交锁定 / Submit &amp; Lock</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- M-02 出库打包 -->
+  <div class="screen mobile">
+    <div class="bar"><b>M-02 出库打包（分步）</b><span>打包→箱标→发运</span></div>
+    <div class="body phone">
+      <div class="status"><span>9:41</span><span>BOE US RMA</span></div>
+      <div class="app-head"><b>按箱打包 · OB261103001</b></div>
+      <div class="content">
+        <div style="background:#fff;border-radius:8px;padding:12px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:#595959">
+            <span>第 1 步 · 扫 SN 入箱</span><span>已扫 5 片</span>
+          </div>
+          <div style="margin-top:8px;font-size:11px;color:#8c8c8c;line-height:1.8">SN-88213 / 88215 / 88220 / 88231 / 88240</div>
+          <button class="btn ghost block" style="margin-top:8px">继续扫码</button>
+        </div>
+        <div style="display:flex;gap:8px">
+          <div style="flex:1;background:#fff;border-radius:8px;padding:10px">
+            <div class="lbl" style="font-size:11px;color:#8c8c8c">重量 kg *</div>
+            <div style="font-size:15px;font-weight:600">2.35</div>
+          </div>
+          <div style="flex:1;background:#fff;border-radius:8px;padding:10px">
+            <div class="lbl" style="font-size:11px;color:#8c8c8c">材积 m³ *</div>
+            <div style="font-size:15px;font-weight:600">0.012</div>
+          </div>
+        </div>
+        <div class="feedback warn">⚠ 物流公司与单号必填后才能发运</div>
+      </div>
+      <div class="sticky" style="display:flex;flex-direction:column;gap:8px">
+        <button class="btn ghost block">打印箱标 / Print Label</button>
+        <button class="btn primary block">提交发运（物流公司+单号）</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="note" style="margin-top:24px">
+  ※ 本稿为交互/视觉基线：Web 采用成熟组件库风格；移动端点击逐个扫；箱标浏览器打印；中英双语标签；所有页面状态（空/加载/异常/无权限/状态拦截）在设计交付时补齐。
+</div>
+
+</body>
+</html>

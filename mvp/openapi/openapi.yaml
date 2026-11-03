@@ -1,0 +1,615 @@
+openapi: 3.0.3
+info:
+  title: BOE US RMA 收发管理系统 API
+  version: 1.0.0
+  description: |
+    一期 MVP 接口。基线：PRD V1.22。所有接口需 `Authorization: Bearer <JWT>`（登录接口除外）。
+    权限按 5 角色矩阵校验，越权返回 403。状态机非法跃迁返回 409 `ILLEGAL_TRANSITION`。
+    列表分页统一 `page` + `size`（10/20/50/200，缺省 20）。
+servers:
+  - url: http://localhost:8080/api/v1
+tags:
+  - name: auth
+  - name: master
+  - name: forecast
+  - name: receiving
+  - name: kitting
+  - name: discrepancy
+  - name: inspection
+  - name: outbound
+  - name: packing
+  - name: return
+  - name: buffer
+  - name: report
+  - name: trace
+
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    Page: { name: page, in: query, schema: { type: integer, default: 1 } }
+    Size: { name: size, in: query, schema: { type: integer, enum: [10, 20, 50, 200], default: 20 } }
+  schemas:
+    Error:
+      type: object
+      properties:
+        code: { type: string, example: ILLEGAL_TRANSITION }
+        message: { type: string }
+    Page:
+      type: object
+      properties:
+        items: { type: array, items: {} }
+        total: { type: integer }
+        page: { type: integer }
+        size: { type: integer }
+    LoginReq:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string }
+        password: { type: string }
+    LoginResp:
+      type: object
+      properties:
+        token: { type: string }
+        user_id: { type: string }
+        username: { type: string }
+        role: { type: string, enum: [warehouse_operator, project_staff, inspector, customer, admin] }
+        display_name: { type: string }
+    ForecastSN:
+      type: object
+      properties:
+        sn: { type: string }
+        pn_code: { type: string }
+    CreateForecastReq:
+      type: object
+      required: [rma_no, customer]
+      properties:
+        rma_no: { type: string }
+        pn_code: { type: string }
+        model_code: { type: string }
+        customer: { type: string }
+        forecast_qty: { type: integer, description: 留空则取 items 长度 }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ForecastSN' }
+        sn_list:
+          type: array
+          items: { type: string }
+        confirm_secondary_return: { type: boolean }
+        late_receive: { type: boolean, description: CLOSED_SHORT 迟到货重收（DC-10） }
+    CreateBatchReq:
+      type: object
+      required: [forecast_no, pod_photo_ids]
+      properties:
+        forecast_no: { type: string }
+        label_qty_total: { type: integer, description: 外箱标识数量合计 }
+        pod_photo_ids: { type: array, items: { type: string } }
+    ScanReq:
+      type: object
+      required: [box_no, sn]
+      properties:
+        box_no: { type: string }
+        sn: { type: string }
+        pn_code: { type: string, description: 选填，提供才做 PN 维度比对 }
+    ScanResp:
+      type: object
+      properties:
+        result: { type: string, enum: [OK, DISCREPANCY] }
+        discrepancy_type: { type: string }
+        message: { type: string }
+        sn_status: { type: string }
+        box_sn_count: { type: integer }
+        record_no: { type: string }
+    SubmitDiscReq:
+      type: object
+      required: [photo_ids]
+      properties:
+        photo_ids: { type: array, items: { type: string } }
+        note: { type: string }
+    ApproveDiscReq:
+      type: object
+      properties:
+        note: { type: string }
+    JudgeReq:
+      type: object
+      required: [sn, judgment_result]
+      properties:
+        sn: { type: string }
+        judgment_result: { type: string, enum: [REPAIR, REPLACE, SCRAP, TRANSFER_RC, CID_RETURN] }
+        cid_flag: { type: boolean }
+        damage_photo_ids: { type: array, items: { type: string } }
+        customer_confirmation: { type: string }
+        note: { type: string }
+    CreateOutboundReq:
+      type: object
+      required: [outbound_type, sns]
+      properties:
+        outbound_type: { type: string, enum: [SHIP_TO_CUSTOMER, SHIP_TO_RC, SCRAP_DISPOSAL, TRANSFER_WAREHOUSE] }
+        sns: { type: array, items: { type: string } }
+        rma_no: { type: string }
+        cid_flag: { type: boolean }
+        transfer_no: { type: string }
+    ShipReq:
+      type: object
+      required: [carrier, tracking_no]
+      properties:
+        carrier: { type: string }
+        tracking_no: { type: string }
+        logistics_no: { type: string }
+    CreateShipBoxReq:
+      type: object
+      required: [outbound_no]
+      properties:
+        outbound_no: { type: string }
+        rma_nos: { type: array, items: { type: string } }
+    SealShipBoxReq:
+      type: object
+      required: [weight, volume]
+      properties:
+        weight: { type: number, description: kg }
+        volume: { type: number, description: m³ }
+    CreateReturnReq:
+      type: object
+      required: [original_sn]
+      properties:
+        rma_no: { type: string }
+        original_sn: { type: string }
+        buffer_sn: { type: string, description: 指定备件 SN；跨 PN 需先审批 }
+    DisposeReq:
+      type: object
+      required: [retained_disposition]
+      properties:
+        retained_disposition: { type: string, enum: [SCRAPPED, RETURN_VENDOR, REPAIR_TO_BUFFER, LONG_RETAIN] }
+        note: { type: string }
+    InboundReq:
+      type: object
+      required: [sn, pn_code, source]
+      properties:
+        sn: { type: string }
+        pn_code: { type: string }
+        source: { type: string, enum: [NEW_PURCHASE, REPAIRED_GOOD] }
+    SubstituteReq:
+      type: object
+      required: [original_sn, substitute_sn]
+      properties:
+        original_sn: { type: string }
+        substitute_sn: { type: string }
+        note: { type: string }
+
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/login:
+    post:
+      tags: [auth]
+      security: []
+      summary: 登录（客户角色一期返回 403）
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/LoginReq' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/LoginResp' } } } }
+        '401': { description: 凭证错误, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '403': { description: 客户账号一期不开放 }
+  /auth/me:
+    get:
+      tags: [auth]
+      summary: 当前用户
+      responses: { '200': { description: OK } }
+
+  /master/models:
+    get: { tags: [master], summary: 机型列表, responses: { '200': { description: OK } } }
+    post:
+      tags: [master]
+      summary: 新增机型（项目/管理员）
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { model_code: { type: string }, model_name: { type: string } } } } } }
+      responses: { '201': { description: Created }, '403': { description: 越权 } }
+  /master/pns:
+    get: { tags: [master], summary: 料号列表, responses: { '200': { description: OK } } }
+    post:
+      tags: [master]
+      summary: 新增料号
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { pn_code: { type: string }, model_code: { type: string }, description: { type: string } } } } } }
+      responses: { '201': { description: Created } }
+  /master/import:
+    post:
+      tags: [master]
+      summary: 主数据 Excel 导入（列 TYPE/CODE/NAME/MODEL，异常行整表阻断）
+      requestBody:
+        required: true
+        content: { multipart/form-data: { schema: { type: object, properties: { file: { type: string, format: binary } } } } }
+      responses: { '200': { description: OK }, '400': { description: 存在异常行 } }
+  /users:
+    get: { tags: [master], summary: 用户列表（管理员）, responses: { '200': { description: OK } } }
+    post:
+      tags: [master]
+      summary: 新增用户（管理员，5 角色）
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { username: { type: string }, password: { type: string }, display_name: { type: string }, role: { type: string } } } } } }
+      responses: { '201': { description: Created } }
+
+  /photos:
+    post:
+      tags: [kitting]
+      summary: 上传照片（≤10MB，≥2 年留存）
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+                biz_type: { type: string, enum: [DISCREPANCY_EVIDENCE, CID_DAMAGE_EVIDENCE, POD, BOX_LABEL, SHIPMENT] }
+                biz_ref_no: { type: string }
+                sn: { type: string }
+                pn_code: { type: string }
+      responses: { '201': { description: Created }, '413': { description: 超过 10MB } }
+    get: { tags: [kitting], summary: 照片查询, responses: { '200': { description: OK } } }
+
+  /forecasts:
+    post:
+      tags: [forecast]
+      summary: 预报录入（SN 条数必须等于预报数量；PN 必须存在；二次返修仅 COMPLETED）
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateForecastReq' } } } }
+      responses:
+        '201': { description: Created }
+        '400': { description: 数量不一致 / PN 不存在 }
+        '409': { description: RMA 已存在 / 二次返修被阻断 }
+    get:
+      tags: [forecast]
+      summary: 预报/RMA 列表
+      parameters:
+        - { name: status, in: query, schema: { type: string } }
+        - { name: customer, in: query, schema: { type: string } }
+        - { name: keyword, in: query, schema: { type: string } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Page' } } } } }
+  /forecasts/{no}:
+    get:
+      tags: [forecast]
+      summary: 预报详情（含 SN 明细与状态）
+      parameters: [{ name: no, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: OK } }
+  /forecasts/{no}/export:
+    get:
+      tags: [forecast]
+      summary: 预报导出 Excel
+      parameters: [{ name: no, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: xlsx binary } }
+  /forecasts/import-sn:
+    post:
+      tags: [forecast]
+      summary: SN 清单 Excel 导入
+      requestBody: { required: true, content: { multipart/form-data: { schema: { type: object, properties: { file: { type: string, format: binary } } } } } }
+      responses: { '200': { description: OK } }
+  /forecasts/template:
+    get: { tags: [forecast], summary: 下载 SN 导入模板, responses: { '200': { description: xlsx binary } } }
+
+  /receiving/batches:
+    post:
+      tags: [receiving]
+      summary: 物流允收登记（只确认外箱标识数量 + POD，不开箱/不生成箱号）
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateBatchReq' } } } }
+      responses: { '201': { description: Created }, '400': { description: 缺 POD } }
+    get:
+      tags: [receiving]
+      summary: 允收批次列表
+      parameters:
+        - { name: forecast_no, in: query, schema: { type: string } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses: { '200': { description: OK } }
+
+  /boxes:
+    post:
+      tags: [kitting]
+      summary: 开箱生成收货箱号（BOE+YYMMDD+3位）
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { batch_no: { type: string } } } } } }
+      responses: { '201': { description: Created } }
+    get:
+      tags: [kitting]
+      summary: 箱列表
+      parameters:
+        - { name: batch_no, in: query, schema: { type: string } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses: { '200': { description: OK } }
+  /boxes/{no}:
+    get:
+      tags: [kitting]
+      summary: 箱详情
+      parameters: [{ name: no, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: OK } }
+  /boxes/scan:
+    post:
+      tags: [kitting]
+      summary: 逐片扫码四维校验（SN/PN/RMA/数量），差异即时生成记录
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ScanReq' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ScanResp' } } } }
+        '409': { description: 重复扫码 / 箱已封 / 状态不允许 }
+  /boxes/{no}/seal:
+    post:
+      tags: [kitting]
+      summary: 封箱（锁定箱内 SN）
+      parameters: [{ name: no, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: OK }, '400': { description: 空箱 } }
+  /boxes/{no}/label:
+    get:
+      tags: [kitting]
+      summary: 收货箱标 HTML（浏览器打印；箱号 + SN 明细）
+      parameters: [{ name: no, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: text/html } }
+
+  /discrepancies:
+    get:
+      tags: [discrepancy]
+      summary: 差异列表（tab=pending/done/anomaly）
+      parameters:
+        - { name: tab, in: query, schema: { type: string, enum: [pending, done, anomaly] } }
+        - { name: forecast_no, in: query, schema: { type: string } }
+        - { name: keyword, in: query, schema: { type: string } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses: { '200': { description: OK } }
+  /discrepancies/{no}:
+    get:
+      tags: [discrepancy]
+      summary: 差异详情
+      parameters: [{ name: no, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: OK } }
+  /discrepancies/{no}/submit:
+    post:
+      tags: [discrepancy]
+      summary: 补佐证照片并提交（多收≥3、少收≥2、其他≥1）
+      parameters: [{ name: no, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SubmitDiscReq' } } } }
+      responses: { '200': { description: OK }, '400': { description: 照片不足 } }
+  /discrepancies/{no}/approve:
+    post:
+      tags: [discrepancy]
+      summary: 审批通过（KITTING 差异 → 预报 REVISED + 双异常记录；RECEIVING 差异 → 仅放行）
+      parameters: [{ name: no, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ApproveDiscReq' } } } }
+      responses: { '200': { description: OK }, '409': { description: 未提交 / 状态不允许 } }
+  /discrepancies/{no}/reject:
+    post:
+      tags: [discrepancy]
+      summary: 驳回（自动解锁允许重扫）
+      parameters: [{ name: no, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { reason: { type: string } } } } } }
+      responses: { '200': { description: OK } }
+
+  /inspections:
+    get:
+      tags: [inspection]
+      summary: 待质检列表（仅 RECEIVED）
+      parameters:
+        - { name: status, in: query, schema: { type: string } }
+        - { name: forecast_no, in: query, schema: { type: string } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses: { '200': { description: OK } }
+    post:
+      tags: [inspection]
+      summary: 单条判定
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/JudgeReq' } } } }
+      responses:
+        '200': { description: OK }
+        '400': { description: CID 证据缺失 }
+        '409': { description: 非 RECEIVED 状态 }
+  /inspections/batch:
+    post:
+      tags: [inspection]
+      summary: 批量判定
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/JudgeReq' } } } } } }
+      responses: { '200': { description: OK } }
+
+  /outbounds:
+    post:
+      tags: [outbound]
+      summary: 创建出库单（报废单自动进入 PENDING_APPROVAL）
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateOutboundReq' } } } }
+      responses: { '201': { description: Created }, '409': { description: 状态白名单不满足 } }
+    get:
+      tags: [outbound]
+      summary: 出库单列表（按类型 Tab）
+      parameters:
+        - { name: outbound_type, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: string } }
+        - { name: keyword, in: query, schema: { type: string } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses: { '200': { description: OK } }
+  /outbounds/{no}:
+    get:
+      tags: [outbound]
+      summary: 出库单详情（含 SN 明细与发货箱）
+      parameters: [{ name: no, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: OK } }
+  /outbounds/{no}/ship:
+    post:
+      tags: [outbound]
+      summary: 发运（物流公司 + 单号必填）
+      parameters: [{ name: no, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ShipReq' } } } }
+      responses: { '200': { description: OK }, '400': { description: 缺物流信息 } }
+  /outbounds/{no}/count-confirm:
+    post:
+      tags: [outbound]
+      summary: 调拨清点确认（完成后 SN=COMPLETED）
+      parameters: [{ name: no, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: OK } }
+  /outbounds/{no}/scrap-approve:
+    post:
+      tags: [outbound]
+      summary: 报废审批通过（项目人员，意见必填）
+      parameters: [{ name: no, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { opinion: { type: string } } } } } }
+      responses: { '200': { description: OK } }
+  /outbounds/{no}/scrap-reject:
+    post:
+      tags: [outbound]
+      summary: 报废驳回（REJECTED，可重提交，原片状态不变）
+      parameters: [{ name: no, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { reason: { type: string } } } } } }
+      responses: { '200': { description: OK } }
+  /outbounds/{no}/scrap-resubmit:
+    post:
+      tags: [outbound]
+      summary: 报废单重提交
+      parameters: [{ name: no, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: OK } }
+
+  /shipment-boxes:
+    post:
+      tags: [packing]
+      summary: 新建发货箱（OB+YYMMDD+3位）
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateShipBoxReq' } } } }
+      responses: { '201': { description: Created } }
+    get:
+      tags: [packing]
+      summary: 发货箱列表
+      parameters:
+        - { name: outbound_no, in: query, schema: { type: string } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses: { '200': { description: OK } }
+  /shipment-boxes/{no}/items:
+    post:
+      tags: [packing]
+      summary: 扫 SN 入发货箱
+      parameters: [{ name: no, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { sn: { type: string } } } } } }
+      responses: { '200': { description: OK } }
+  /shipment-boxes/{no}/seal:
+    post:
+      tags: [packing]
+      summary: 封箱（重量/材积必填）
+      parameters: [{ name: no, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SealShipBoxReq' } } } }
+      responses: { '200': { description: OK } }
+  /shipment-boxes/{no}/label:
+    get:
+      tags: [packing]
+      summary: 发货箱标 HTML（RMA+箱号+SN+重量+材积）
+      parameters: [{ name: no, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: text/html } }
+
+  /returns:
+    post:
+      tags: [return]
+      summary: 发起还货（三段式自动带出方式；BUFFER 自动预占 RESERVED）
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateReturnReq' } } } }
+      responses:
+        '201': { description: Created }
+        '409': { description: BUFFER 不足 / 跨 PN 未审批 / 状态不允许 }
+  /rma/{no}/return-progress:
+    get:
+      tags: [return]
+      summary: 还货进度
+      parameters: [{ name: no, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: OK } }
+  /return-board:
+    get:
+      tags: [return]
+      summary: 还货看板（TAT 标红）
+      parameters:
+        - { name: status, in: query, schema: { type: string } }
+        - { name: keyword, in: query, schema: { type: string } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses: { '200': { description: OK } }
+  /retained/{sn}/dispose:
+    post:
+      tags: [return]
+      summary: RETAINED 原片处置（4 条路径）
+      parameters: [{ name: sn, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/DisposeReq' } } } }
+      responses: { '200': { description: OK }, '409': { description: 非 RETAINED } }
+
+  /buffer/inbound:
+    post:
+      tags: [buffer]
+      summary: 备件入库（PN 必须存在主数据）
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/InboundReq' } } } }
+      responses: { '201': { description: Created } }
+  /buffer/stock:
+    get:
+      tags: [buffer]
+      summary: 按 PN 库存汇总
+      parameters: [{ name: pn_code, in: query, schema: { type: string } }]
+      responses: { '200': { description: OK } }
+  /buffer/sns:
+    get:
+      tags: [buffer]
+      summary: 备件明细 SN
+      parameters:
+        - { name: pn_code, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: string } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses: { '200': { description: OK } }
+  /buffer/{sn}/scrap:
+    post:
+      tags: [buffer]
+      summary: 备件报废（单独流程）
+      parameters: [{ name: sn, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { reason: { type: string } } } } } }
+      responses: { '200': { description: OK } }
+  /buffer/substitute:
+    post:
+      tags: [buffer]
+      summary: 发起跨 PN 替代审批
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SubstituteReq' } } } }
+      responses: { '201': { description: Created } }
+  /buffer/substitute/{no}/approve:
+    post:
+      tags: [buffer]
+      summary: 跨 PN 替代审批（仅项目人员）
+      parameters: [{ name: no, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { note: { type: string }, approve: { type: boolean } } } } } }
+      responses: { '200': { description: OK } }
+
+  /reports/rma:
+    get: { tags: [report], summary: RMA/客户维度汇总, responses: { '200': { description: OK } } }
+  /reports/sku:
+    get: { tags: [report], summary: SKU 维度统计, responses: { '200': { description: OK } } }
+  /reports/trend:
+    get:
+      tags: [report]
+      summary: 周期趋势（period=week|month）
+      parameters: [{ name: period, in: query, schema: { type: string, enum: [week, month] } }]
+      responses: { '200': { description: OK } }
+  /reports/discrepancy:
+    get: { tags: [report], summary: 差异统计 + 出库分布（含 CID 占比）, responses: { '200': { description: OK } } }
+  /reports/detail:
+    get: { tags: [report], summary: 明细报表（RP-05 字段口径）, responses: { '200': { description: OK } } }
+  /reports/tat:
+    get: { tags: [report], summary: TAT 平均/分布/超期率, responses: { '200': { description: OK } } }
+  /reports/tat-alerts:
+    get: { tags: [report], summary: TAT 预警列表（第 8 天预警 / >10 标红）, responses: { '200': { description: OK } } }
+  /reports/tat-refresh:
+    post: { tags: [report], summary: 刷新 TAT 标记, responses: { '200': { description: OK } } }
+
+  /sn/{sn}/trace:
+    get:
+      tags: [trace]
+      summary: SN 全生命周期轨迹（含轮次、差异、判定、还货、照片、审计）
+      parameters: [{ name: sn, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: OK } }
+  /audit-logs:
+    get:
+      tags: [trace]
+      summary: 审计日志查询（项目/管理员）
+      parameters:
+        - { name: action, in: query, schema: { type: string } }
+        - { name: biz_no, in: query, schema: { type: string } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses: { '200': { description: OK } }

@@ -1,0 +1,29 @@
+# ---- 依赖 / 构建产物 ----
+node_modules/
+dist/
+*.exe
+*.exe~
+vendor/
+
+# ---- 运行时数据（SQLite / 上传 / 日志）----
+data/
+*.db
+*.db-shm
+*.db-wal
+*.log
+logs/
+
+# ---- 编辑器 / 系统 ----
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# ---- 内部工作区数据（不进仓库）----
+.workbuddy/
+toolchain/
+
+# ---- 环境变量（含密码，禁止提交）----
+.env
+deploy/.env
+!deploy/.env.example
